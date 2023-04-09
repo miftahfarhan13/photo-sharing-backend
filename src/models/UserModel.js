@@ -18,12 +18,24 @@ const User = db.define('users', {
         type: DataTypes.STRING,
         allowNull: false,
     },
+    username: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
     password: {
         type: DataTypes.TEXT,
     },
     role: {
         type: DataTypes.STRING,
         defaultValue: "general",
+    },
+    bio: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+    },
+    website: {
+        type: DataTypes.STRING,
+        allowNull: true,
     },
     profilePictureUrl: {
         type: DataTypes.TEXT,

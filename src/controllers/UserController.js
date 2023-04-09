@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import Jwt from 'jsonwebtoken'
 import User from "../models/UserModel.js";
+import Follow from "../models/FollowModel.js";
 import Validator from 'fastest-validator'
 
 const v = new Validator()
@@ -9,11 +10,13 @@ export const registerUser = async (req, res) => {
 
     const schema = {
         name: "string",
+        username: "string",
         email: "string",
         password: "string|min:6",
         passwordRepeat: "string|min:6",
-        role: "string",
         profilePictureUrl: "string|optional",
+        bio: "string|optional",
+        website: "string|optional",
         phoneNumber: "string|optional|min:0|max:13",
         // description: "number|optional|integer|positive|min:0|max:99", // additional properties
         // state: ["boolean", "number|min:0|max:1"] // multiple types
@@ -36,11 +39,13 @@ export const registerUser = async (req, res) => {
             bcrypt.hash(req.body.password, salt, (err, hash) => {
                 const user = {
                     name: req.body.name,
+                    username: req.body.username,
                     email: req.body.email,
-                    role: req.body.role,
                     password: hash,
                     profilePictureUrl: req.body.profilePictureUrl,
-                    phoneNumber: req.body.phoneNumber
+                    phoneNumber: req.body.phoneNumber,
+                    bio: req.body.bio,
+                    website: req.body.website
                 }
 
                 User.create(user).then((result) => {
@@ -50,10 +55,13 @@ export const registerUser = async (req, res) => {
                         message: "User Created",
                         data: {
                             name: req.body.name,
+                            username: req.body.username,
                             email: req.body.email,
-                            role: req.body.role,
+                            password: hash,
                             profilePictureUrl: req.body.profilePictureUrl,
-                            phoneNumber: req.body.phoneNumber
+                            phoneNumber: req.body.phoneNumber,
+                            bio: req.body.bio,
+                            website: req.body.website
                         }
                     })
                 }).catch((error) => {
@@ -134,11 +142,14 @@ export const loginUser = async (req, res) => {
                             message: "Authentication successful",
                             user: {
                                 id: findUser.id,
+                                username: findUser.username,
                                 name: findUser.name,
                                 email: findUser.email,
                                 role: findUser.role,
                                 profilePictureUrl: findUser.profilePictureUrl,
-                                phoneNumber: findUser.phoneNumber
+                                phoneNumber: findUser.phoneNumber,
+                                bio: findUser.bio,
+                                website: findUser.website
                             },
                             token: token
                         })
@@ -174,17 +185,77 @@ export const getUserLogin = async (req, res) => {
                         id: decoded.userId
                     }
                 })
+
+                const totalFollowing = await Follow.count({ where: { userId: decoded.userId } })
+                const totalFollowers = await Follow.count({ where: { userIdFollow: decoded.userId } })
+
                 res.status(200).json({
                     code: "200",
                     status: "OK",
                     message: "User found",
-                    user: {
+                    data: {
                         id: findUser.id,
+                        username: findUser.username,
                         name: findUser.name,
                         email: findUser.email,
-                        role: findUser.role,
                         profilePictureUrl: findUser.profilePictureUrl,
-                        phoneNumber: findUser.phoneNumber
+                        phoneNumber: findUser.phoneNumber,
+                        bio: findUser.bio,
+                        website: findUser.website,
+                        totalFollowing,
+                        totalFollowers
+                    },
+                });
+            } else {
+                res.status(401).json({
+                    code: "401",
+                    status: "UNAUTHORIZED",
+                    message: 'Unauthorized'
+                });
+            }
+        }
+    } catch (error) {
+        res.status(500).json({
+            code: "500",
+            status: "SERVER_ERROR",
+            message: "Something went wrong",
+            errors: error.message
+        })
+    }
+}
+
+export const getUserByUserId = async (req, res) => {
+    try {
+        if (req.headers && req.headers.authorization) {
+            const authorization = req.headers.authorization.split(' ')[1]
+            const decoded = Jwt.verify(authorization, 'secret');
+
+            if (decoded) {
+                const { id } = req.params
+                const findUser = await User.findOne({
+                    where: {
+                        id: id
+                    }
+                })
+
+                const totalFollowing = await Follow.count({ where: { userId: id } })
+                const totalFollowers = await Follow.count({ where: { userIdFollow: id } })
+
+                res.status(200).json({
+                    code: "200",
+                    status: "OK",
+                    message: "User found",
+                    data: {
+                        id: findUser.id,
+                        username: findUser.username,
+                        name: findUser.name,
+                        email: findUser.email,
+                        profilePictureUrl: findUser.profilePictureUrl,
+                        phoneNumber: findUser.phoneNumber,
+                        bio: findUser.bio,
+                        website: findUser.website,
+                        totalFollowing,
+                        totalFollowers
                     },
                 });
             } else {
@@ -242,6 +313,9 @@ export const updateProfileUser = async (req, res) => {
             email: "email|optional",
             profilePictureurl: "string|optional|min:1",
             phoneNumber: "string|optional|min:1",
+            username: "string|optional|min:1",
+            bio: "string|optional",
+            website: "string|optional",
         }
 
         const validate = v.validate(req.body, schema)
@@ -268,12 +342,29 @@ export const updateProfileUser = async (req, res) => {
                 })
             }
 
+            const findUserEmail = await User.findOne({
+                where: {
+                    email: req.body.email
+                }
+            })
+
+            if (findUserEmail) {
+                return res.status(404).json({
+                    code: "409",
+                    status: "CONFLICT",
+                    message: "Email already taken"
+                })
+            }
+
             if (decoded) {
                 await User.update({
                     name: req.body.name,
                     email: req.body.email,
                     profilePictureUrl: req.body.profilePictureUrl,
-                    phoneNumber: req.body.phoneNumber
+                    phoneNumber: req.body.phoneNumber,
+                    username: req.body.username,
+                    bio: req.body.bio,
+                    website: req.body.website,
                 }, {
                     where: {
                         id: decoded.userId
@@ -299,50 +390,6 @@ export const updateProfileUser = async (req, res) => {
                 message: 'Unauthorized'
             });
         }
-    } catch (error) {
-        res.status(500).json({
-            code: "500",
-            status: "SERVER_ERROR",
-            message: "Something went wrong",
-            errors: error.message
-        })
-    }
-}
-
-export const updateProfileUserRole = async (req, res) => {
-    try {
-        const schema = {
-            role: "string|min:1",
-        }
-
-        const validate = v.validate(req.body, schema)
-
-        if (validate.length) {
-            return res.status(400).json({ code: "400", status: "BAD_REQUEST", errors: validate })
-        }
-
-        const findUser = await User.findOne({
-            where: {
-                id: req.params.userId
-            }
-        })
-
-        if (findUser == null) {
-            return res.status(404).json({ code: "404", status: "NOT_FOUND", message: "User not found" })
-        }
-
-        await User.update({
-            role: req.body.role,
-        }, {
-            where: {
-                id: req.params.userId
-            }
-        })
-        res.status(200).json({
-            code: "200",
-            status: "OK",
-            message: "User Role Updated"
-        })
     } catch (error) {
         res.status(500).json({
             code: "500",
