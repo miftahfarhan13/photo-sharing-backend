@@ -4,6 +4,8 @@ import UserRoute from "./src/routes/UserRoute.js"
 import PostRoute from "./src/routes/PostRoute.js"
 import FollowRoute from "./src/routes/FollowRoute.js"
 import CommentRoute from "./src/routes/CommentRoute.js"
+import LikeRoute from "./src/routes/LikeRoute.js"
+import ImageRoute from "./src/routes/ImageRoute.js"
 import multer from "multer";
 import bodyParser from "body-parser";
 
@@ -38,5 +40,7 @@ app.use(UserRoute)
 app.use(PostRoute)
 app.use(FollowRoute)
 app.use(CommentRoute)
+app.use(LikeRoute)
+app.use(ImageRoute)
 
 app.listen(4000, () => console.log('Server up and running at http://localhost:4000'));

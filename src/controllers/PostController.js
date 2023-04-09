@@ -1,3 +1,4 @@
+import sequelize from "sequelize";
 import Post from "../models/PostModel.js";
 import Follow from "../models/FollowModel.js";
 import Comment from "../models/CommentModel.js";
@@ -5,6 +6,7 @@ import Validator from 'fastest-validator'
 import Jwt from 'jsonwebtoken'
 import User from "../models/UserModel.js";
 import { Sequelize } from "sequelize";
+import Like from "../models/LikeModel.js";
 
 const v = new Validator()
 
@@ -197,42 +199,59 @@ const getPagingData = (data, page, limit) => {
 
 export const getRandomPost = async (req, res) => {
     try {
-        let postArray = []
+        if (req.headers && req.headers.authorization) {
+            const authorization = req.headers.authorization.split(' ')[1]
+            const decoded = Jwt.verify(authorization, 'secret');
 
-        const { page, size } = req.query;
-        const { limit, offset } = getPagination(page, size);
+            if (decoded) {
+                let postArray = []
 
-        const total = await Post.count();
+                const { page, size } = req.query;
+                const { limit, offset } = getPagination(page, size);
 
-        await Post.findAll({
-            order: Sequelize.literal('random()'),
-            raw: true,
-            limit: limit,
-            offset: offset
-        }).then(async (data) => {
-            for await (const post of data) {
-                const user = await User.findOne({ where: { id: post.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
+                const total = await Post.count();
 
-                postArray.push({
-                    id: post.id,
-                    userId: post.userId,
-                    imageUrl: post.imageUrl,
-                    caption: post.caption,
-                    user: user,
-                    createdAt: post.createdAt,
-                    updatedAt: post.updatedAt
-                })
+                await Post.findAll({
+                    order: Sequelize.literal('random()'),
+                    raw: true,
+                    limit: limit,
+                    offset: offset
+                }).then(async (data) => {
+                    for await (const post of data) {
+                        const totalLikes = await Like.count({ where: { postId: post.id } })
+                        const isLikes = await Like.findOne({ where: { postId: post.id, userId: decoded.userId }, raw: true })
+                        const user = await User.findOne({ where: { id: post.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
+
+                        postArray.push({
+                            id: post.id,
+                            userId: post.userId,
+                            imageUrl: post.imageUrl,
+                            caption: post.caption,
+                            isLike: isLikes ? true : false,
+                            totalLikes,
+                            user: user,
+                            createdAt: post.createdAt,
+                            updatedAt: post.updatedAt
+                        })
+                    }
+                });
+
+                const data = getPagingData({ count: total, rows: postArray }, page, limit);
+
+                return res.status(200).json({
+                    code: "200",
+                    status: "OK",
+                    message: "Success",
+                    data: data,
+                });
+            } else {
+                res.status(401).json({
+                    code: "401",
+                    status: "UNAUTHORIZED",
+                    message: 'Unauthorized'
+                });
             }
-        });
-
-        const data = getPagingData({ count: total, rows: postArray }, page, limit);
-
-        return res.status(200).json({
-            code: "200",
-            status: "OK",
-            message: "Success",
-            data: data,
-        });
+        }
     } catch (error) {
         return res.status(500).json({
             code: "500",
@@ -245,48 +264,67 @@ export const getRandomPost = async (req, res) => {
 
 export const getPostByUserId = async (req, res) => {
     try {
-        let postArray = []
-        const { userId } = req.params
-        const { page, size } = req.query;
-        const { limit, offset } = getPagination(page, size);
+        if (req.headers && req.headers.authorization) {
+            const authorization = req.headers.authorization.split(' ')[1]
+            const decoded = Jwt.verify(authorization, 'secret');
 
-        const total = await Post.count({
-            where: {
-                userId,
-            },
-        });
+            if (decoded) {
+                let postArray = []
+                const { userId } = req.params
+                const { page, size } = req.query;
+                const { limit, offset } = getPagination(page, size);
 
-        await Post.findAll({
-            raw: true,
-            limit,
-            offset,
-            where: {
-                userId,
-            },
-        }).then(async (data) => {
-            for await (const post of data) {
-                const user = await User.findOne({ where: { id: post.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
+                const total = await Post.count({
+                    where: {
+                        userId,
+                    },
+                });
 
-                postArray.push({
-                    id: post.id,
-                    userId: post.userId,
-                    imageUrl: post.imageUrl,
-                    caption: post.caption,
-                    user: user,
-                    createdAt: post.createdAt,
-                    updatedAt: post.updatedAt
-                })
+                await Post.findAll({
+                    raw: true,
+                    limit,
+                    offset,
+                    where: {
+                        userId,
+                    },
+                }).then(async (data) => {
+                    for await (const post of data) {
+                        const totalLikes = await Like.count({ where: { postId: post.id } })
+                        const isLikes = await Like.findOne({ where: { postId: post.id, userId: decoded.userId }, raw: true })
+                        const user = await User.findOne({ where: { id: post.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
+
+                        postArray.push({
+                            id: post.id,
+                            userId: post.userId,
+                            imageUrl: post.imageUrl,
+                            caption: post.caption,
+                            isLike: isLikes ? true : false,
+                            totalLikes,
+                            user: user,
+                            createdAt: post.createdAt,
+                            updatedAt: post.updatedAt
+                        })
+                    }
+                });
+
+                const data = getPagingData({ count: total, rows: postArray }, page, limit);
+
+                return res.status(200).json({
+                    code: "200",
+                    status: "OK",
+                    message: "Success",
+                    data: data,
+                });
+            } else {
+                res.status(401).json({
+                    code: "401",
+                    status: "UNAUTHORIZED",
+                    message: 'Unauthorized'
+                });
             }
-        });
+        }
 
-        const data = getPagingData({ count: total, rows: postArray }, page, limit);
 
-        return res.status(200).json({
-            code: "200",
-            status: "OK",
-            message: "Success",
-            data: data,
-        });
     } catch (error) {
         return res.status(500).json({
             code: "500",
@@ -393,6 +431,8 @@ export const getMyFollowingPosts = async (req, res) => {
                     },
                 }).then(async (data) => {
                     for await (const post of data) {
+                        const totalLikes = await Like.count({ where: { postId: post.id } })
+                        const isLikes = await Like.findOne({ where: { postId: post.id, userId: decoded.userId }, raw: true })
                         const user = await User.findOne({ where: { id: post.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
 
                         postArray.push({
@@ -400,6 +440,8 @@ export const getMyFollowingPosts = async (req, res) => {
                             userId: post.userId,
                             imageUrl: post.imageUrl,
                             caption: post.caption,
+                            isLike: isLikes ? true : false,
+                            totalLikes,
                             user: user,
                             createdAt: post.createdAt,
                             updatedAt: post.updatedAt
