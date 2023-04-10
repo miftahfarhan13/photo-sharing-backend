@@ -1,0 +1,7 @@
+version: "3.3"
+services:
+  travel-journal:
+    build: .
+    ports:
+      - "4020:4000"
+    restart: always
