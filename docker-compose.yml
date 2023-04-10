@@ -1,6 +1,6 @@
 version: "3.3"
 services:
-  travel-journal:
+  photo-sharing:
     build: .
     ports:
       - "4020:4000"
