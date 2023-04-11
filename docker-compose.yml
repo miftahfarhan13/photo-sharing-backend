@@ -5,3 +5,5 @@ services:
     ports:
       - "4020:4000"
     restart: always
+    volumes:
+      - ./public:/app/public
