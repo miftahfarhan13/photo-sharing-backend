@@ -1,4 +1,3 @@
-import sequelize from "sequelize";
 import Post from "../models/PostModel.js";
 import Follow from "../models/FollowModel.js";
 import Comment from "../models/CommentModel.js";
