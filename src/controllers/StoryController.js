@@ -307,3 +307,72 @@ export const getMyFollowingStories = async (req, res) => {
         })
     }
 }
+
+export const getMyStories = async (req, res) => {
+    try {
+        if (req.headers && req.headers.authorization) {
+            const authorization = req.headers.authorization.split(' ')[1]
+            const decoded = Jwt.verify(authorization, 'secret');
+
+            if (decoded) {
+                let storyArray = []
+                const { page, size } = req.query;
+                const { limit, offset } = getPagination(page, size);
+
+                const total = await Story.count({
+                    where: {
+                        userId: decoded.userId,
+                    },
+                });
+
+                await Story.findAll({
+                    raw: true,
+                    limit,
+                    offset,
+                    where: {
+                        userId: decoded.userId,
+                    },
+                }).then(async (data) => {
+                    for await (const story of data) {
+                        const totalViews = await View.count({ where: { referenceId: story.id } })
+                        const user = await User.findOne({ where: { id: story.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
+
+                        storyArray.push({
+                            id: story.id,
+                            userId: story.userId,
+                            imageUrl: story.imageUrl,
+                            caption: story.caption,
+                            totalViews,
+                            user: user,
+                            createdAt: story.createdAt,
+                            updatedAt: story.updatedAt
+                        })
+                    }
+                });
+
+                const data = getPagingData({ count: total, rows: storyArray }, page, limit);
+
+                return res.status(200).json({
+                    code: "200",
+                    status: "OK",
+                    message: "Success",
+                    data: data,
+                });
+            } else {
+                res.status(401).json({
+                    code: "401",
+                    status: "UNAUTHORIZED",
+                    message: 'Unauthorized'
+                });
+            }
+        }
+
+    } catch (error) {
+        return res.status(500).json({
+            code: "500",
+            status: "SERVER_ERROR",
+            message: "Something went wrong",
+            errors: error.message
+        })
+    }
+}
