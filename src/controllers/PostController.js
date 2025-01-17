@@ -336,6 +336,9 @@ export const getPostByUserId = async (req, res) => {
 
 export const getPostById = async (req, res) => {
     try {
+        const authorization = req.headers.authorization.split(' ')[1]
+        const decoded = Jwt.verify(authorization, 'secret');
+
         const { id } = req.params
 
         const postResponse = await Post.findOne({
@@ -345,6 +348,8 @@ export const getPostById = async (req, res) => {
             },
         })
 
+        const totalLikes = await Like.count({ where: { postId: postResponse.id } })
+        const isLikes = await Like.findOne({ where: { postId: postResponse.id, userId: decoded.userId }, raw: true })
         const userResponse = await User.findOne({ where: { id: postResponse.userId }, raw: true, attributes: ['id', 'username', 'email', 'profilePictureUrl', 'createdAt'] })
 
         const comments = []
@@ -370,11 +375,13 @@ export const getPostById = async (req, res) => {
             userId: postResponse.userId,
             imageUrl: postResponse.imageUrl,
             caption: postResponse.caption,
+            ...(decoded.userId && { isLike: !!isLikes }),
+            totalLikes,
             user: userResponse,
             comments: comments,
             createdAt: postResponse.createdAt,
-            updatedAt: postResponse.updatedAt
-        }
+            updatedAt: postResponse.updatedAt,
+        };
 
         return res.status(200).json({
             code: "200",
